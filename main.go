@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 )
@@ -8,7 +9,7 @@ import (
 var wg sync.WaitGroup
 
 // キャンセルされるまでnumをひたすら送信し続けるチャネルを生成
-func generator(doneChannel chan string, num int) <-chan int {
+func generator(ctx context.Context, num int) <-chan int {
 	// チャネル作成
 	outChannel := make(chan int)
 
@@ -19,7 +20,7 @@ func generator(doneChannel chan string, num int) <-chan int {
 	LOOP:
 		for {
 			select {
-			case <-doneChannel: // doneチャネルがcloseされたらbreakが実行される
+			case <-ctx.Done():
 				break LOOP
 			case outChannel <- num: // キャンセルされてなければnumを送信
 			}
@@ -34,9 +35,11 @@ func generator(doneChannel chan string, num int) <-chan int {
 func main() {
 
 	// チェネルを作成する
-	doneChannel := make(chan string)
+	// doneChannel := make(chan string)
 
-	gen := generator(doneChannel, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	gen := generator(ctx, 1)
 
 	wg.Add(1)
 
@@ -45,7 +48,8 @@ func main() {
 		fmt.Println(a)
 	}
 
-	close(doneChannel) // 5回genを使ったら、doneチャネルをcloseしてキャンセルを実行
+	// close(doneChannel) // 5回genを使ったら、doneチャネルをcloseしてキャンセルを実行
+	cancel()
 
 	wg.Wait()
 }
